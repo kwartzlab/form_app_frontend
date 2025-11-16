@@ -4,13 +4,14 @@ import ContactInfoSection from './components/ContactInfoSection';
 import ExpensesTable from './components/ExpensesTable';
 import FileUploadSection from './components/FileUploadSection';
 import CommentsSection from './components/CommentsSection';
-import Header from './components/Header'
-import formTypes from './FormTypes'
+import Header from './components/Header';
+import formTypes from './FormTypes';
+import tableConfigs from './tableConfigs';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
 
-const DEV = true
+const DEV = true;
 
 export default function ReimbursementForm() {
   const [formData, setFormData] = useState({
@@ -21,14 +22,17 @@ export default function ReimbursementForm() {
   });
 
   const [formType, setFormType] = useState({
-    type: 'RR',
+    type: 'Reimbursement Request',
     title: 'Reimbursement Request',
     blurb: 'This form is for submitting already-approved purchases (or lab consumables under $50). If you need to get approval for a new purchase, use the Purchase Approval Form instead.',
     endpoint: '/submit'
-  })
+  });
+
+  // Get initial config based on form type
+  const [currentConfig, setCurrentConfig] = useState(tableConfigs[formType.type]);
 
   const [expenses, setExpenses] = useState([
-    { id: 1, approval: '', vendor: '', description: '', amount: '', hst: 'HST included in amount', calculated_amount: '' }
+    { ...currentConfig.initialExpense }
   ]);
   
   const [files, setFiles] = useState([]);
@@ -36,57 +40,67 @@ export default function ReimbursementForm() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
+  const fileInputRef = React.useRef(null);
+  const hcaptchaRef = React.useRef(null);
+
   const handleInputChange = (e) => {                        //only first name, last name, email, and comments call handleInputChange. Expense rows and files call their own handlers 
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleFormTypeChange = (e) => {
-    setFormType({ type: e, title: formTypes[e]["title"], blurb: formTypes[e]["blurb"], endpoint: formTypes[e]["endpoint"] });
-  }
-
-  const handleExpenseChange = (id, field, value) => {
-    setExpenses(expenses.map(exp => 
-      exp.id === id ? { ...exp, [field]: value } : exp      //for every expense, if expense id matches id, expand expense and replace value of passed field with passed value, else leave expense the same
-    ));
+    const newType = e;
+    const newConfig = tableConfigs[newType];
+    
+    setFormType({ 
+      type: newType, 
+      title: formTypes[newType]["title"], 
+      blurb: formTypes[newType]["blurb"], 
+      endpoint: formTypes[newType]["endpoint"] 
+    });
+    
+    setCurrentConfig(newConfig);
+    
+    // Preserve common fields when switching form types
+    const newExpenses = expenses.map(expense => {
+      const newExpense = { ...newConfig.initialExpense, id: expense.id };
+      
+      // Copy over common fields that exist in both configs
+      newConfig.columns.forEach(column => {
+        if (expense[column.key] !== undefined) {
+          newExpense[column.key] = expense[column.key];
+        }
+      });
+      
+      // Recalculate calculated_amount if it exists in new config
+      if (newExpense.calculated_amount !== undefined) {
+        newExpense.calculated_amount = newConfig.calculateAmount(newExpense);
+      }
+      
+      return newExpense;
+    });
+    
+    setExpenses(newExpenses);
   };
 
-  const newHSTCalculateAmount = (exp, value) => {
-    exp['hst'] = value;
-    if (value === 'HST excluded from amount') exp['calculated_amount'] = (exp['amount'] * 1.13).toFixed(2);
-    else exp['calculated_amount'] = exp['amount'];
-    return exp;
-  }
-
-  const newAmountCalculateAmount = (exp, value) => {
-    exp['amount'] = value;
-    if (exp['hst'] === 'HST excluded from amount') exp['calculated_amount'] = (value * 1.13).toFixed(2);
-    else exp['calculated_amount'] = value;
-    return exp;
-  }
-
-  const handleExpenseHSTChange = (id, field, value) => {
-    setExpenses(expenses.map(exp => 
-      exp.id === id ? newHSTCalculateAmount(exp, value) : exp
-    ));
-  }
-
-  const handleExpenseAmountChange = (id, field, value) => {
-    setExpenses(expenses.map(exp => 
-      exp.id === id ? newAmountCalculateAmount(exp, Math.max(value, 0)) : exp
-    ));
-  }
+  const handleExpenseChange = (id, field, value) => {
+    setExpenses(expenses.map(exp => {
+      if (exp.id !== id) return exp;      //for every expense, if expense id matches id, expand expense and replace value of passed field with passed value, else leave expense the same
+      
+      const updatedExpense = { ...exp, [field]: value };
+      
+      // If amount or hst changed, recalculate calculated_amount
+      if ((field === 'amount' || field === 'hst') && currentConfig.calculateAmount) {
+        updatedExpense.calculated_amount = currentConfig.calculateAmount(updatedExpense);
+      }
+      
+      return updatedExpense;
+    }));
+  };
 
   const addExpenseRow = () => {
     const newId = Math.max(...expenses.map(e => e.id)) + 1;     //sets new ID at highest of old IDs + 1, rather than re-using deleted lower ids. testing shows no problems, probably don't need to test beyond normal integer bounds
-    setExpenses([...expenses, {
-      id: newId,
-      approval: '',
-      vendor: '',
-      description: '',
-      amount: '',
-      hst: 'HST included in amount',
-      calculated_amount: '',
-    }]);
+    const newExpense = { ...currentConfig.initialExpense, id: newId };
+    setExpenses([...expenses, newExpense]);
   };
 
   const removeExpenseRow = (id) => {
@@ -94,9 +108,6 @@ export default function ReimbursementForm() {
       setExpenses(expenses.filter(exp => exp.id !== id));     //filter returns new array containing all elements that meet the condition
     }
   };
-
-  const fileInputRef = React.useRef(null);
-  const hcaptchaRef = React.useRef(null);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -153,9 +164,24 @@ export default function ReimbursementForm() {
 
   const calculateTotal = () => {
     return expenses.reduce((sum, exp) => {
-      const amount = parseFloat(exp.calculated_amount) || 0;
+      // Use calculated_amount if it exists, otherwise use amount
+      const amount = parseFloat(exp.calculated_amount || exp.amount) || 0;
       return sum + amount;
     }, 0).toFixed(2);
+  };
+
+  // Filter expenses to only include fields defined in current config before submitting
+  const getFilteredExpenses = () => {
+    const validKeys = currentConfig.columns.map(col => col.key);
+    return expenses.map(expense => {
+      const filtered = { id: expense.id };
+      validKeys.forEach(key => {
+        if (expense[key] !== undefined) {
+          filtered[key] = expense[key];
+        }
+      });
+      return filtered;
+    });
   };
 
   const handleSubmit = async () => {
@@ -187,7 +213,9 @@ export default function ReimbursementForm() {
       formDataToSend.append('lastName', formData.lastName);
       formDataToSend.append('email', formData.email);
       formDataToSend.append('comments', formData.comments);
-      formDataToSend.append('expenses', JSON.stringify(expenses));
+      
+      // Send only the fields that exist in the current form config
+      formDataToSend.append('expenses', JSON.stringify(getFilteredExpenses()));
       formDataToSend.append('captchaToken', captchaToken);
       
       files.forEach((file, index) => {
@@ -195,21 +223,21 @@ export default function ReimbursementForm() {
       });
 
       //TODO add deployment backend url
-      const url = (DEV ? 'http://localhost:5000' : '') + formType["endpoint"]
-      console.log(url)
-      const response = await fetch(url, {method: 'POST', body: formDataToSend})
+      const url = (DEV ? 'http://localhost:5000' : '') + formType["endpoint"];
+      console.log(url);
+      const response = await fetch(url, {method: 'POST', body: formDataToSend});
 
       if (response.ok) {
         setMessage({ type: 'success', text: formType.title + ' submitted successfully!' });
         // Reset
         setFormData({ firstName: '', lastName: '', email: '', comments: '' });
-        setExpenses([{ id: 1, approval: '', vendor: '', description: '', amount: '', hst: 'HST included in amount', calculated_amount: '' }]);
+        setExpenses([{ ...currentConfig.initialExpense }]);
         setFiles([]);
         setCaptchaToken(null);
         hcaptchaRef.current?.resetCaptcha();
       } else {
         const error = await response.json();
-        setMessage({ type: 'error', text: error.message || 'Submission failed. Please try again.' });
+        setMessage({ type: 'error', text: error.error || 'Submission failed. Please try again.' });
         hcaptchaRef.current?.resetCaptcha();
         setCaptchaToken(null);
       }
@@ -251,9 +279,8 @@ export default function ReimbursementForm() {
         {/* Expenses Table */}
         <ExpensesTable
           expenses={expenses}
+          config={currentConfig}
           onExpenseChange={handleExpenseChange}
-          onExpenseAmountChange={handleExpenseAmountChange}
-          onExpenseHSTChange={handleExpenseHSTChange}
           onAddRow={addExpenseRow}
           onRemoveRow={removeExpenseRow}
           calculateTotal={calculateTotal}
