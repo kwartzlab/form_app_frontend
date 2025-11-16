@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Upload, X } from 'lucide-react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
+
 export default function ReimbursementForm() {
   const [formData, setFormData] = useState({
     firstName: '',
@@ -80,14 +83,46 @@ export default function ReimbursementForm() {
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
+      
+      // Check individual file sizes
+      const oversizedFiles = newFiles.filter(file => file.size > MAX_FILE_SIZE);
+      if (oversizedFiles.length > 0) {
+        setMessage({ 
+          type: 'error', 
+          text: `File(s) too large: ${oversizedFiles.map(f => f.name).join(', ')}. Maximum size is 10MB per file.` 
+        });
+        e.target.value = '';
+        return;
+      }
+      
+      // Check total size (existing + new files)
+      const currentTotal = files.reduce((sum, file) => sum + file.size, 0);
+      const newTotal = newFiles.reduce((sum, file) => sum + file.size, 0);
+      
+      if (currentTotal + newTotal > MAX_TOTAL_SIZE) {
+        setMessage({ 
+          type: 'error', 
+          text: `Total file size exceeds 50MB limit. Current total: ${((currentTotal + newTotal) / (1024 * 1024)).toFixed(2)}MB` 
+        });
+        e.target.value = '';
+        return;
+      }
+    
       setFiles([...files, ...newFiles]);
-      // Reset the input value so the same file can be selected again if needed
       e.target.value = '';
     }
   };
 
   const removeFile = (index) => {
     setFiles(files.filter((_, i) => i !== index));            //files.filter() passes iterable list of files to fn inside brackets, "_" shows that the file itself is ignored
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
   const handleUploadClick = () => {
@@ -360,17 +395,19 @@ export default function ReimbursementForm() {
             {files.length > 0 && (
               <div className="mt-3 space-y-2">
                 {files.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
-                    <span className="text-sm text-gray-700">{file.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ))}
+                <div key={index} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
+                  <span className="text-sm text-gray-700">
+                    {file.name} ({formatFileSize(file.size)})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(index)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
               </div>
             )}
           </div>
