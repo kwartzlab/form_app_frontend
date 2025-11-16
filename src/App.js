@@ -10,7 +10,7 @@ export default function ReimbursementForm() {
   });
   
   const [expenses, setExpenses] = useState([
-    { id: 1, approval: '', vendor: '', description: '', amount: '', hst: 'HST included in amount' }
+    { id: 1, approval: '', vendor: '', description: '', amount: '', hst: 'HST included in amount', calculated_amount: '' }
   ]);
   
   const [files, setFiles] = useState([]);
@@ -35,6 +35,32 @@ export default function ReimbursementForm() {
     ));
   };
 
+  const newHSTCalculateAmount = (exp, value) => {
+    exp['hst'] = value;
+    if (value === 'HST excluded from amount') exp['calculated_amount'] = (exp['amount'] * 1.13).toFixed(2);
+    else exp['calculated_amount'] = exp['amount'];
+    return exp;
+  }
+
+  const newAmountCalculateAmount = (exp, value) => {
+    exp['amount'] = value;
+    if (exp['hst'] === 'HST excluded from amount') exp['calculated_amount'] = (value * 1.13).toFixed(2);
+    else exp['calculated_amount'] = value;
+    return exp;
+  }
+
+  const handleExpenseHSTChange = (id, field, value) => {
+    setExpenses(expenses.map(exp => 
+      exp.id === id ? newHSTCalculateAmount(exp, value) : exp
+    ));
+  }
+
+  const handleExpenseAmountChange = (id, field, value) => {
+    setExpenses(expenses.map(exp => 
+      exp.id === id ? newAmountCalculateAmount(exp, value) : exp
+    ));
+  }
+
   const addExpenseRow = () => {
     const newId = Math.max(...expenses.map(e => e.id)) + 1;     //sets new ID at highest of old IDs + 1, rather than re-using deleted lower ids. testing shows no problems, probably don't need to test beyond normal integer bounds
     setExpenses([...expenses, {
@@ -43,7 +69,8 @@ export default function ReimbursementForm() {
       vendor: '',
       description: '',
       amount: '',
-      hst: 'HST included in amount'
+      hst: 'HST included in amount',
+      calculated_amount: '',
     }]);
   };
 
@@ -75,7 +102,7 @@ export default function ReimbursementForm() {
 
   const calculateTotal = () => {
     return expenses.reduce((sum, exp) => {
-      const amount = parseFloat(exp.amount) || 0;
+      const amount = parseFloat(exp.calculated_amount) || 0;
       return sum + amount;
     }, 0).toFixed(2);
   };
@@ -134,7 +161,7 @@ export default function ReimbursementForm() {
         setMessage({ type: 'success', text: 'Reimbursement request submitted successfully!' });
         // Reset
         setFormData({ firstName: '', lastName: '', email: '', comments: '' });
-        setExpenses([{ id: 1, approval: '', vendor: '', description: '', amount: '', hst: 'HST included in amount' }]);
+        setExpenses([{ id: 1, approval: '', vendor: '', description: '', amount: '', hst: 'HST included in amount', calculated_amount: '' }]);
         setFiles([]);
         setCaptchaValue('');
         setCaptchaAnswer(generateCaptcha());
@@ -216,6 +243,7 @@ export default function ReimbursementForm() {
                   <th className="border border-gray-300 px-2 py-2 text-left text-xs font-medium text-gray-700">Item Description</th>
                   <th className="border border-gray-300 px-2 py-2 text-left text-xs font-medium text-gray-700">Amount ($)</th>
                   <th className="border border-gray-300 px-2 py-2 text-left text-xs font-medium text-gray-700">HST</th>
+                  <th className="border border-gray-300 px-2 py-2 text-left text-xs font-medium text-gray-700">Calculated Amount ($)</th>
                   <th className="border border-gray-300 px-2 py-2 w-10"></th>
                 </tr>
               </thead>
@@ -251,20 +279,28 @@ export default function ReimbursementForm() {
                         type="number"
                         step="0.01"
                         value={expense.amount}
-                        onChange={(e) => handleExpenseChange(expense.id, 'amount', e.target.value)}
+                        onChange={(e) => handleExpenseAmountChange(expense.id, 'amount', e.target.value)}
                         className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </td>
                     <td className="border border-gray-300 p-1">
                       <select
                         value={expense.hst}
-                        onChange={(e) => handleExpenseChange(expense.id, 'hst', e.target.value)}
+                        onChange={(e) => handleExpenseHSTChange(expense.id, 'hst', e.target.value)}
                         className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       >
                         <option>HST included in amount</option>
                         <option>HST excluded from amount</option>
                         <option>HST not charged</option>
                       </select>
+                    </td>
+                    <td className="border border-gray-300 p-1">
+                      <input
+                        type="number"
+                        readonly
+                        value={expense.calculated_amount}
+                        className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
                     </td>
                     <td className="border border-gray-300 p-1 text-center">
                       <button
