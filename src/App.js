@@ -200,7 +200,7 @@ export default function ReimbursementForm() {
       const response = await fetch(url, {method: 'POST', body: formDataToSend})
 
       if (response.ok) {
-        setMessage({ type: 'success', text: 'Reimbursement request submitted successfully!' });
+        setMessage({ type: 'success', text: formType.title + ' submitted successfully!' });
         // Reset
         setFormData({ firstName: '', lastName: '', email: '', comments: '' });
         setExpenses([{ id: 1, approval: '', vendor: '', description: '', amount: '', hst: 'HST included in amount', calculated_amount: '' }]);
