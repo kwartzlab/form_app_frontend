@@ -4,9 +4,13 @@ import ContactInfoSection from './components/ContactInfoSection';
 import ExpensesTable from './components/ExpensesTable';
 import FileUploadSection from './components/FileUploadSection';
 import CommentsSection from './components/CommentsSection';
+import Header from './components/Header'
+import formTypes from './FormTypes'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
+
+const DEV = true
 
 export default function ReimbursementForm() {
   const [formData, setFormData] = useState({
@@ -15,7 +19,14 @@ export default function ReimbursementForm() {
     email: '',
     comments: ''
   });
-  
+
+  const [formType, setFormType] = useState({
+    type: 'RR',
+    title: 'Reimbursement Request',
+    blurb: 'This form is for submitting already-approved purchases (or lab consumables under $50). If you need to get approval for a new purchase, use the Purchase Approval Form instead.',
+    endpoint: '/submit'
+  })
+
   const [expenses, setExpenses] = useState([
     { id: 1, approval: '', vendor: '', description: '', amount: '', hst: 'HST included in amount', calculated_amount: '' }
   ]);
@@ -28,6 +39,10 @@ export default function ReimbursementForm() {
   const handleInputChange = (e) => {                        //only first name, last name, email, and comments call handleInputChange. Expense rows and files call their own handlers 
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
+  const handleFormTypeChange = (e) => {
+    setFormType({ type: e, title: formTypes[e]["title"], blurb: formTypes[e]["blurb"], endpoint: formTypes[e]["endpoint"] });
+  }
 
   const handleExpenseChange = (id, field, value) => {
     setExpenses(expenses.map(exp => 
@@ -179,18 +194,10 @@ export default function ReimbursementForm() {
         formDataToSend.append(`file${index}`, file);
       });
 
-      // Replace with your actual backend URL
-      /*const response = await fetch('https://your-backend-url.railway.app/submit', {
-        method: 'POST',
-        body: formDataToSend
-      });*/
-
-      //for dev
-      const response = await fetch('http://localhost:5000/submit', {
-        method: 'POST',
-        body: formDataToSend
-      })
-
+      //TODO add deployment backend url
+      const url = (DEV ? 'http://localhost:5000' : '') + formType["endpoint"]
+      console.log(url)
+      const response = await fetch(url, {method: 'POST', body: formDataToSend})
 
       if (response.ok) {
         setMessage({ type: 'success', text: 'Reimbursement request submitted successfully!' });
@@ -217,7 +224,16 @@ export default function ReimbursementForm() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Reimbursement Request</h1>
+      <select
+        value={formType.type}
+        onChange={(e) => handleFormTypeChange(e.target.value)}
+        className="w-full px-2 py-4 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
+      >
+        <option>Reimbursement Request</option>
+        <option>Purchase Approval</option>
+      </select>
+
+      <Header content={formType}/>
       
       {message.text && (
         <div className={`mb-4 p-4 rounded ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -278,7 +294,7 @@ export default function ReimbursementForm() {
           disabled={submitting}
           className="w-full bg-blue-600 text-white py-3 rounded font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          {submitting ? 'Submitting...' : 'Submit Reimbursement Request'}
+          {submitting ? 'Submitting...' : 'Submit ' + formType["title"]}
         </button>
       </div>
     </div>
