@@ -57,7 +57,7 @@ export default function ReimbursementForm() {
 
   const handleExpenseAmountChange = (id, field, value) => {
     setExpenses(expenses.map(exp => 
-      exp.id === id ? newAmountCalculateAmount(exp, value) : exp
+      exp.id === id ? newAmountCalculateAmount(exp, Math.max(value, 0)) : exp
     ));
   }
 
@@ -278,6 +278,7 @@ export default function ReimbursementForm() {
                       <input
                         type="number"
                         step="0.01"
+                        min="0"
                         value={expense.amount}
                         onChange={(e) => handleExpenseAmountChange(expense.id, 'amount', e.target.value)}
                         className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
