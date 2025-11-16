@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Upload, X } from 'lucide-react';
+import HCaptcha from '@hcaptcha/react-hcaptcha';
 
 export default function ReimbursementForm() {
   const [formData, setFormData] = useState({
@@ -14,16 +15,9 @@ export default function ReimbursementForm() {
   ]);
   
   const [files, setFiles] = useState([]);
-  const [captchaValue, setCaptchaValue] = useState('');     //todo: replace with embedding an actual captcha
-  const [captchaAnswer, setCaptchaAnswer] = useState(generateCaptcha());
+  const [captchaToken, setCaptchaToken] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-
-  function generateCaptcha() {
-    const num1 = Math.floor(Math.random() * 10) + 1;
-    const num2 = Math.floor(Math.random() * 10) + 1;
-    return { num1, num2, answer: num1 + num2 };
-  }
 
   const handleInputChange = (e) => {                        //only first name, last name, email, and comments call handleInputChange. Expense rows and files call their own handlers 
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -81,10 +75,10 @@ export default function ReimbursementForm() {
   };
 
   const fileInputRef = React.useRef(null);
+  const hcaptchaRef = React.useRef(null);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      //when file change event occurs, event.target contains the new files
       const newFiles = Array.from(e.target.files);
       setFiles([...files, ...newFiles]);
       // Reset the input value so the same file can be selected again if needed
@@ -100,6 +94,10 @@ export default function ReimbursementForm() {
     fileInputRef.current?.click();
   };
 
+  const onCaptchaChange = (token) => {
+    setCaptchaToken(token);
+  };
+
   const calculateTotal = () => {
     return expenses.reduce((sum, exp) => {
       const amount = parseFloat(exp.calculated_amount) || 0;
@@ -109,10 +107,8 @@ export default function ReimbursementForm() {
 
   const handleSubmit = async () => {
     // Validate captcha
-    if (parseInt(captchaValue) !== captchaAnswer.answer) {
-      setMessage({ type: 'error', text: 'Incorrect captcha answer. Please try again.' });
-      setCaptchaAnswer(generateCaptcha());
-      setCaptchaValue('');
+    if (!captchaToken) {
+      setMessage({ type: 'error', text: 'Please complete the captcha verification.' });
       return;
     }
 
@@ -139,6 +135,7 @@ export default function ReimbursementForm() {
       formDataToSend.append('email', formData.email);
       formDataToSend.append('comments', formData.comments);
       formDataToSend.append('expenses', JSON.stringify(expenses));
+      formDataToSend.append('captchaToken', captchaToken);
       
       files.forEach((file, index) => {
         formDataToSend.append(`file${index}`, file);
@@ -163,14 +160,18 @@ export default function ReimbursementForm() {
         setFormData({ firstName: '', lastName: '', email: '', comments: '' });
         setExpenses([{ id: 1, approval: '', vendor: '', description: '', amount: '', hst: 'HST included in amount', calculated_amount: '' }]);
         setFiles([]);
-        setCaptchaValue('');
-        setCaptchaAnswer(generateCaptcha());
+        setCaptchaToken(null);
+        hcaptchaRef.current?.resetCaptcha();
       } else {
         const error = await response.json();
         setMessage({ type: 'error', text: error.message || 'Submission failed. Please try again.' });
+        hcaptchaRef.current?.resetCaptcha();
+        setCaptchaToken(null);
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Network error. Please check your connection and try again.' });
+      hcaptchaRef.current?.resetCaptcha();
+      setCaptchaToken(null);
     } finally {
       setSubmitting(false);
     }
@@ -391,14 +392,13 @@ export default function ReimbursementForm() {
 
         {/* Captcha */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Security Check: What is {captchaAnswer.num1} + {captchaAnswer.num2}? <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Security Check <span className="text-red-500">*</span>
           </label>
-          <input
-            type="number"
-            value={captchaValue}
-            onChange={(e) => setCaptchaValue(e.target.value)}
-            className="w-32 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <HCaptcha
+            ref={hcaptchaRef}
+            sitekey="24a08dca-e6e4-4f3e-b174-ce08af6a235a"
+            onVerify={onCaptchaChange}
           />
         </div>
 
