@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Upload, X } from 'lucide-react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
+import ContactInfoSection from './components/ContactInfoSection';
+import ExpensesTable from './components/ExpensesTable';
+import FileUploadSection from './components/FileUploadSection';
+import CommentsSection from './components/CommentsSection';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
@@ -224,208 +227,37 @@ export default function ReimbursementForm() {
 
       <div className="space-y-6">
         {/* Personal Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              First Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="firstName"
-              value={formData.firstName}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Last Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="lastName"
-              value={formData.lastName}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Email Address <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <ContactInfoSection
+          formData={formData} 
+          onChange={handleInputChange}
+        />
 
         {/* Expenses Table */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Expenses <span className="text-red-500">*</span>
-          </label>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-300">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="border border-gray-300 px-2 py-2 text-left text-xs font-medium text-gray-700">Approval/Project</th>
-                  <th className="border border-gray-300 px-2 py-2 text-left text-xs font-medium text-gray-700">Vendor</th>
-                  <th className="border border-gray-300 px-2 py-2 text-left text-xs font-medium text-gray-700">Item Description</th>
-                  <th className="border border-gray-300 px-2 py-2 text-left text-xs font-medium text-gray-700">Amount ($)</th>
-                  <th className="border border-gray-300 px-2 py-2 text-left text-xs font-medium text-gray-700">HST</th>
-                  <th className="border border-gray-300 px-2 py-2 text-left text-xs font-medium text-gray-700">Calculated Amount ($)</th>
-                  <th className="border border-gray-300 px-2 py-2 w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map((expense) => (
-                  <tr key={expense.id}>
-                    <td className="border border-gray-300 p-1">
-                      <input
-                        type="text"
-                        value={expense.approval}
-                        onChange={(e) => handleExpenseChange(expense.id, 'approval', e.target.value)}
-                        className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="border border-gray-300 p-1">
-                      <input
-                        type="text"
-                        value={expense.vendor}
-                        onChange={(e) => handleExpenseChange(expense.id, 'vendor', e.target.value)}
-                        className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="border border-gray-300 p-1">
-                      <input
-                        type="text"
-                        value={expense.description}
-                        onChange={(e) => handleExpenseChange(expense.id, 'description', e.target.value)}
-                        className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="border border-gray-300 p-1">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={expense.amount}
-                        onChange={(e) => handleExpenseAmountChange(expense.id, 'amount', e.target.value)}
-                        className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="border border-gray-300 p-1">
-                      <select
-                        value={expense.hst}
-                        onChange={(e) => handleExpenseHSTChange(expense.id, 'hst', e.target.value)}
-                        className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option>HST included in amount</option>
-                        <option>HST excluded from amount</option>
-                        <option>HST not charged</option>
-                      </select>
-                    </td>
-                    <td className="border border-gray-300 p-1">
-                      <input
-                        type="number"
-                        readonly
-                        value={expense.calculated_amount}
-                        className="w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="border border-gray-300 p-1 text-center">
-                      <button
-                        type="button"
-                        onClick={() => removeExpenseRow(expense.id)}
-                        disabled={expenses.length === 1}
-                        className="text-red-600 hover:text-red-800 disabled:text-gray-300 disabled:cursor-not-allowed"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          <div className="flex justify-between items-center mt-2">
-            <button
-              type="button"
-              onClick={addExpenseRow}
-              className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-            >
-              <Plus size={16} /> Add Row
-            </button>
-            <div className="text-lg font-semibold text-gray-800">
-              Total: ${calculateTotal()}
-            </div>
-          </div>
-        </div>
+        <ExpensesTable
+          expenses={expenses}
+          onExpenseChange={handleExpenseChange}
+          onExpenseAmountChange={handleExpenseAmountChange}
+          onExpenseHSTChange={handleExpenseHSTChange}
+          onAddRow={addExpenseRow}
+          onRemoveRow={removeExpenseRow}
+          calculateTotal={calculateTotal}
+        />
 
         {/* File Attachments */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Attachments
-          </label>
-          <div className="border-2 border-dashed border-gray-300 rounded p-4">
-            <input
-              type="file"
-              multiple
-              onChange={handleFileChange}
-              ref={fileInputRef}
-              className="hidden"
-              id="file-upload"
-            />
-            <button
-              type="button"
-              onClick={handleUploadClick}
-              className="flex items-center justify-center gap-2 w-full cursor-pointer text-blue-600 hover:text-blue-800"
-            >
-              <Upload size={20} />
-              <span>Click to upload files</span>
-            </button>
-            
-            {files.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {files.map((file, index) => (
-                <div key={index} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
-                  <span className="text-sm text-gray-700">
-                    {file.name} ({formatFileSize(file.size)})
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(index)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <FileUploadSection
+          files={files}
+          fileInputRef={fileInputRef}
+          onFileChange={handleFileChange}
+          onRemoveFile={removeFile}
+          onUploadClick={handleUploadClick}
+          formatFileSize={formatFileSize}
+        />
 
         {/* Comments */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Additional Comments
-          </label>
-          <textarea
-            name="comments"
-            value={formData.comments}
-            onChange={handleInputChange}
-            rows="4"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <CommentsSection
+          formData={formData} 
+          onChange={handleInputChange}
+        />
 
         {/* Captcha */}
         <div>
