@@ -62,17 +62,18 @@ export default function ReimbursementForm() {
     
     // Preserve common fields when switching form types
     const newExpenses = expenses.map(expense => {
+      // Start with initial expense structure to ensure all fields exist
       const newExpense = { ...newConfig.initialExpense, id: expense.id };
       
-      // Copy over common fields that exist in both configs
+      // Copy over common fields that exist in both configs (preserving user data)
       newConfig.columns.forEach(column => {
-        if (expense[column.key] !== undefined) {
+        if (expense[column.key] !== undefined && expense[column.key] !== null) {
           newExpense[column.key] = expense[column.key];
         }
       });
       
       // Recalculate calculated_amount if it exists in new config
-      if (newExpense.calculated_amount !== undefined) {
+      if (newExpense.calculated_amount !== undefined && newConfig.calculateAmount) {
         newExpense.calculated_amount = newConfig.calculateAmount(newExpense);
       }
       
@@ -184,6 +185,26 @@ export default function ReimbursementForm() {
     });
   };
 
+  // Validate that all expense fields are filled
+  const validateExpenses = () => {
+    for (const expense of expenses) {
+      for (const column of currentConfig.columns) {
+        // Skip readonly fields like calculated_amount
+        if (column.readonly) continue;
+        
+        // Check if field is empty or undefined
+        const value = expense[column.key];
+        if (value === undefined || value === null || value === '') {
+          return {
+            valid: false,
+            message: `Please fill in all expense fields. Missing: ${column.label}`
+          };
+        }
+      }
+    }
+    return { valid: true };
+  };
+
   const handleSubmit = async () => {
     // Validate captcha
     if (!captchaToken) {
@@ -201,6 +222,13 @@ export default function ReimbursementForm() {
     const hasValidExpense = expenses.some(exp => exp.amount && parseFloat(exp.amount) > 0);
     if (!hasValidExpense) {
       setMessage({ type: 'error', text: 'Please add at least one expense with an amount.' });
+      return;
+    }
+
+    // Validate all expense fields are filled
+    const expenseValidation = validateExpenses();
+    if (!expenseValidation.valid) {
+      setMessage({ type: 'error', text: expenseValidation.message });
       return;
     }
 

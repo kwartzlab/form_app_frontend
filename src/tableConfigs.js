@@ -7,19 +7,19 @@ const tableConfigs = {
         key: 'approval', 
         label: 'Approval/Project', 
         type: 'text',
-        required: false
+        required: true
       },
       { 
         key: 'vendor', 
         label: 'Vendor', 
         type: 'text',
-        required: false
+        required: true
       },
       { 
         key: 'description', 
         label: 'Item Description', 
         type: 'text',
-        required: false
+        required: true
       },
       { 
         key: 'amount', 
@@ -38,7 +38,7 @@ const tableConfigs = {
           'HST excluded from amount',
           'HST not charged'
         ],
-        required: false
+        required: true
       },
       { 
         key: 'calculated_amount', 
@@ -72,13 +72,13 @@ const tableConfigs = {
         key: 'vendor', 
         label: 'Vendor', 
         type: 'text',
-        required: false
+        required: true
       },
       { 
         key: 'description', 
         label: 'Item Description', 
         type: 'text',
-        required: false
+        required: true
       },
       { 
         key: 'amount', 

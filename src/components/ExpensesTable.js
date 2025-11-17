@@ -10,7 +10,11 @@ export default function ExpensesTable({
   calculateTotal 
 }) {
   const renderField = (column, expense) => {
-    const commonClasses = "w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500";
+    const isEmpty = !expense[column.key] || expense[column.key] === '';
+    const isRequired = column.required;
+    const highlightClass = isEmpty && isRequired ? 'bg-red-50' : '';
+
+    const commonClasses = `w-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 ${highlightClass}`;
     
     switch (column.type) {
       case 'text':
@@ -20,6 +24,7 @@ export default function ExpensesTable({
             value={expense[column.key] || ''}
             onChange={(e) => onExpenseChange(expense.id, column.key, e.target.value)}
             className={commonClasses}
+            required={isRequired}
           />
         );
       
