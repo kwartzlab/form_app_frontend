@@ -22,14 +22,16 @@ export default function FileUploadSection({
               ref={fileInputRef}
               className="hidden"
               id="file-upload"
+              accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.xlsx,.xls,.csv,.doc,.docx,.txt"
             />
             <button
                 type="button"
                 onClick={onUploadClick}
                 className="flex items-center justify-center gap-2 w-full cursor-pointer text-blue-600 hover:text-blue-800"
+                aria-label="Upload files"
             >
                 <Upload size={20} />
-                <span>Click to upload files</span>
+                <span>Click to upload files (PDF, images, spreadsheets, documents)</span>
             </button>
             
             {files.length > 0 && (
@@ -41,8 +43,9 @@ export default function FileUploadSection({
                   </span>
                   <button
                     type="button"
-                    onClick={onRemoveFile}
+                    onClick={() => onRemoveFile(index)}
                     className="text-red-600 hover:text-red-800"
+                    aria-label={`Remove ${file.name}`}
                   >
                     <X size={16}/>
                   </button>

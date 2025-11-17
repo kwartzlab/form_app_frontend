@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import ContactInfoSection from './components/ContactInfoSection';
 import ExpensesTable from './components/ExpensesTable';
@@ -10,8 +10,17 @@ import tableConfigs from './tableConfigs';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
+const MAX_NAME_LENGTH = 100;
+const MAX_TEXT_FIELD_LENGTH = 500;
+const MAX_COMMENTS_LENGTH = 2000;
+const MAX_AMOUNT = 1000000;
 
-const DEV = true;
+// File type validation
+const ALLOWED_EXTENSIONS = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'xlsx', 'xls', 'csv', 'doc', 'docx', 'txt'];
+
+// Get API URL from environment variable or default to localhost for development
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const HCAPTCHA_SITEKEY = process.env.REACT_APP_HCAPTCHA_SITEKEY || '24a08dca-e6e4-4f3e-b174-ce08af6a235a';
 
 export default function ReimbursementForm() {
   const [formData, setFormData] = useState({
@@ -43,6 +52,16 @@ export default function ReimbursementForm() {
   const fileInputRef = React.useRef(null);
   const hcaptchaRef = React.useRef(null);
 
+  // Auto-clear messages after 5 seconds
+  useEffect(() => {
+    if (message.text) {
+      const timer = setTimeout(() => {
+        setMessage({ type: '', text: '' });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
   const handleInputChange = (e) => {                        //only first name, last name, email, and comments call handleInputChange. Expense rows and files call their own handlers 
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -62,17 +81,14 @@ export default function ReimbursementForm() {
     
     // Preserve common fields when switching form types
     const newExpenses = expenses.map(expense => {
-      // Start with initial expense structure to ensure all fields exist
       const newExpense = { ...newConfig.initialExpense, id: expense.id };
       
-      // Copy over common fields that exist in both configs (preserving user data)
       newConfig.columns.forEach(column => {
         if (expense[column.key] !== undefined && expense[column.key] !== null) {
           newExpense[column.key] = expense[column.key];
         }
       });
       
-      // Recalculate calculated_amount if it exists in new config
       if (newExpense.calculated_amount !== undefined && newConfig.calculateAmount) {
         newExpense.calculated_amount = newConfig.calculateAmount(newExpense);
       }
@@ -110,9 +126,29 @@ export default function ReimbursementForm() {
     }
   };
 
+  const getFileExtension = (filename) => {
+    if (!filename || filename.indexOf('.') === -1) return null;
+    return filename.split('.').pop().toLowerCase();
+  };
+
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
+      
+      // Validate file types
+      const invalidFiles = newFiles.filter(file => {
+        const ext = getFileExtension(file.name);
+        return !ext || !ALLOWED_EXTENSIONS.includes(ext);
+      });
+      
+      if (invalidFiles.length > 0) {
+        setMessage({ 
+          type: 'error', 
+          text: `Invalid file type(s): ${invalidFiles.map(f => f.name).join(', ')}. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}` 
+        });
+        e.target.value = '';
+        return;
+      }
       
       // Check individual file sizes
       const oversizedFiles = newFiles.filter(file => file.size > MAX_FILE_SIZE);
@@ -185,50 +221,90 @@ export default function ReimbursementForm() {
     });
   };
 
-  // Validate that all expense fields are filled
-  const validateExpenses = () => {
-    for (const expense of expenses) {
-      for (const column of currentConfig.columns) {
-        // Skip readonly fields like calculated_amount
-        if (column.readonly) continue;
-        
-        // Check if field is empty or undefined
-        const value = expense[column.key];
-        if (value === undefined || value === null || value === '') {
-          return {
-            valid: false,
-            message: `Please fill in all expense fields. Missing: ${column.label}`
-          };
-        }
-      }
-    }
-    return { valid: true };
-  };
-
-  const handleSubmit = async () => {
+  // Comprehensive validation
+  const validateForm = () => {
     // Validate captcha
     if (!captchaToken) {
-      setMessage({ type: 'error', text: 'Please complete the captcha verification.' });
-      return;
+      return { valid: false, message: 'Please complete the captcha verification.' };
+    }
+
+    // Validate name lengths
+    if (formData.firstName.length > MAX_NAME_LENGTH) {
+      return { valid: false, message: `First name must be ${MAX_NAME_LENGTH} characters or less.` };
+    }
+    if (formData.lastName.length > MAX_NAME_LENGTH) {
+      return { valid: false, message: `Last name must be ${MAX_NAME_LENGTH} characters or less.` };
     }
 
     // Validate required fields
     if (!formData.firstName || !formData.lastName || !formData.email) {
-      setMessage({ type: 'error', text: 'Please fill in all required fields.' });
-      return;
+      return { valid: false, message: 'Please fill in all required fields.' };
     }
 
-    // Validate at least one expense with amount
-    const hasValidExpense = expenses.some(exp => exp.amount && parseFloat(exp.amount) > 0);
-    if (!hasValidExpense) {
-      setMessage({ type: 'error', text: 'Please add at least one expense with an amount.' });
-      return;
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(formData.email)) {
+      return { valid: false, message: 'Please enter a valid email address.' };
     }
 
-    // Validate all expense fields are filled
-    const expenseValidation = validateExpenses();
-    if (!expenseValidation.valid) {
-      setMessage({ type: 'error', text: expenseValidation.message });
+    // Validate comments length
+    if (formData.comments.length > MAX_COMMENTS_LENGTH) {
+      return { valid: false, message: `Comments must be ${MAX_COMMENTS_LENGTH} characters or less.` };
+    }
+
+    // Validate expenses
+    if (expenses.length === 0) {
+      return { valid: false, message: 'Please add at least one expense.' };
+    }
+
+    for (const expense of expenses) {
+      for (const column of currentConfig.columns) {
+        if (column.readonly) continue;
+        
+        // Check if field is empty or undefined
+        const value = expense[column.key];
+        
+        // Select fields always have a value (default), so skip empty check for them
+        if (column.type !== 'select') {
+          if (value === undefined || value === null || value === '') {
+            return { valid: false, message: `Please fill in all expense fields. Missing: ${column.label}` };
+          }
+        }
+
+        // Validate text field lengths
+        if (column.type === 'text' && typeof value === 'string') {
+          if (value.length > MAX_TEXT_FIELD_LENGTH) {
+            return { valid: false, message: `${column.label} must be ${MAX_TEXT_FIELD_LENGTH} characters or less.` };
+          }
+        }
+
+        // Validate amount fields
+        if (column.key === 'amount' && !column.readonly) {
+          const amount = parseFloat(value);
+          if (isNaN(amount)) {
+            return { valid: false, message: `${column.label} must be a valid number.` };
+          }
+          if (amount < 0) {
+            return { valid: false, message: `${column.label} cannot be negative.` };
+          }
+          if (amount > MAX_AMOUNT) {
+            return { valid: false, message: `${column.label} cannot exceed $${MAX_AMOUNT.toLocaleString()}.` };
+          }
+          if (amount === 0) {
+            return { valid: false, message: `${column.label} must be greater than zero.` };
+          }
+        }
+      }
+    }
+
+    return { valid: true };
+  };
+
+  const handleSubmit = async () => {
+    // Comprehensive validation
+    const validation = validateForm();
+    if (!validation.valid) {
+      setMessage({ type: 'error', text: validation.message });
       return;
     }
 
@@ -250,14 +326,15 @@ export default function ReimbursementForm() {
         formDataToSend.append(`file${index}`, file);
       });
 
-      //TODO add deployment backend url
-      const url = (DEV ? 'http://localhost:5000' : '') + formType["endpoint"];
-      console.log(url);
-      const response = await fetch(url, {method: 'POST', body: formDataToSend});
+      const url = API_BASE_URL + formType["endpoint"];
+      const response = await fetch(url, {
+        method: 'POST', 
+        body: formDataToSend
+      });
 
       if (response.ok) {
         setMessage({ type: 'success', text: formType.title + ' submitted successfully!' });
-        // Reset
+        // Reset form
         setFormData({ firstName: '', lastName: '', email: '', comments: '' });
         setExpenses([{ ...currentConfig.initialExpense }]);
         setFiles([]);
@@ -284,6 +361,7 @@ export default function ReimbursementForm() {
         value={formType.type}
         onChange={(e) => handleFormTypeChange(e.target.value)}
         className="w-full px-2 py-4 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        aria-label="Select form type"
       >
         <option>Reimbursement Request</option>
         <option>Purchase Approval</option>
@@ -292,19 +370,21 @@ export default function ReimbursementForm() {
       <Header content={formType}/>
       
       {message.text && (
-        <div className={`mb-4 p-4 rounded ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+        <div 
+          className={`mb-4 p-4 rounded ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+          role="alert"
+          aria-live="polite"
+        >
           {message.text}
         </div>
       )}
 
       <div className="space-y-6">
-        {/* Personal Information */}
         <ContactInfoSection
           formData={formData} 
           onChange={handleInputChange}
         />
 
-        {/* Expenses Table */}
         <ExpensesTable
           expenses={expenses}
           config={currentConfig}
@@ -314,7 +394,6 @@ export default function ReimbursementForm() {
           calculateTotal={calculateTotal}
         />
 
-        {/* File Attachments */}
         <FileUploadSection
           files={files}
           fileInputRef={fileInputRef}
@@ -324,25 +403,22 @@ export default function ReimbursementForm() {
           formatFileSize={formatFileSize}
         />
 
-        {/* Comments */}
         <CommentsSection
           formData={formData} 
           onChange={handleInputChange}
         />
 
-        {/* Captcha */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Security Check <span className="text-red-500">*</span>
           </label>
           <HCaptcha
             ref={hcaptchaRef}
-            sitekey="24a08dca-e6e4-4f3e-b174-ce08af6a235a"
+            sitekey={HCAPTCHA_SITEKEY}
             onVerify={onCaptchaChange}
           />
         </div>
 
-        {/* Submit Button */}
         <button
           type="button"
           onClick={handleSubmit}

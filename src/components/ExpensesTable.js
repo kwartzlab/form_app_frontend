@@ -24,7 +24,9 @@ export default function ExpensesTable({
             value={expense[column.key] || ''}
             onChange={(e) => onExpenseChange(expense.id, column.key, e.target.value)}
             className={commonClasses}
+            maxLength={500}
             required={isRequired}
+            aria-label={column.label}
           />
         );
       
@@ -36,6 +38,7 @@ export default function ExpensesTable({
               readOnly
               value={expense[column.key] || ''}
               className={commonClasses}
+              aria-label={column.label}
             />
           );
         }
@@ -44,9 +47,11 @@ export default function ExpensesTable({
             type="number"
             step={column.step || 0.01}
             min={column.min || 0}
+            max={1000000}
             value={expense[column.key] || ''}
             onChange={(e) => onExpenseChange(expense.id, column.key, e.target.value)}
             className={commonClasses}
+            aria-label={column.label}
           />
         );
       
@@ -56,6 +61,7 @@ export default function ExpensesTable({
             value={expense[column.key] || column.options[0]}
             onChange={(e) => onExpenseChange(expense.id, column.key, e.target.value)}
             className={commonClasses}
+            aria-label={column.label}
           >
             {column.options.map(option => (
               <option key={option} value={option}>{option}</option>
@@ -102,6 +108,7 @@ export default function ExpensesTable({
                     onClick={() => onRemoveRow(expense.id)}
                     disabled={expenses.length === 1}
                     className="text-red-600 hover:text-red-800 disabled:text-gray-300 disabled:cursor-not-allowed"
+                    aria-label="Remove expense row"
                   >
                     <Trash2 size={16} />
                   </button>
