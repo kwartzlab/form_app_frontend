@@ -7,6 +7,7 @@ import CommentsSection from './components/CommentsSection';
 import Header from './components/Header';
 import formTypes from './FormTypes';
 import tableConfigs from './tableConfigs';
+//import { Heading2 } from 'lucide-react';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
@@ -370,15 +371,31 @@ export default function ReimbursementForm() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white">
-      <select
-        value={formType.type}
-        onChange={(e) => handleFormTypeChange(e.target.value)}
-        className="w-full px-2 py-4 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        aria-label="Select form type"
-      >
-        <option>Reimbursement Request</option>
-        <option>Purchase Approval</option>
-      </select>
+      <h2 className="font-medium py-4">Select Form Type</h2>
+
+      <label className="flex items-center">
+        <input
+          type="radio"
+          name="formType"
+          value="Reimbursement Request"
+          checked={formType.type === "Reimbursement Request"}
+          onChange={(e) => handleFormTypeChange(e.target.value)}
+          className="mr-2"
+        />
+        <span>Reimbursement Request</span>
+      </label>
+  
+      <label className="flex items-center">
+        <input
+          type="radio"
+          name="formType"
+          value="Purchase Approval"
+          checked={formType.type === "Purchase Approval"}
+          onChange={(e) => handleFormTypeChange(e.target.value)}
+          className="mr-2"
+        />
+        <span>Purchase Approval</span>
+      </label>
 
       <Header content={formType}/>
       
