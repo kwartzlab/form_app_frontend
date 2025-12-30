@@ -241,6 +241,19 @@ export default function ReimbursementForm() {
       return { valid: false, message: 'Please fill in all required fields.' };
     }
 
+    // Ensure that at least one file has been attached for the reimbursement request
+    if( formType.type === 'Reimbursement Request' && !files){
+      console.log('files object of formData does not exist')
+      return { valid: false, message: 'Please attach at least one file ' };
+    }
+    else{
+      if ((files.length === 0) && formType.type === 'Reimbursement Request') {
+        console.log('files list length is 0')
+        return { valid: false, message: 'Please attach at least one file ' };
+      }
+    }
+    
+
     // Validate email format
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(formData.email)) {
